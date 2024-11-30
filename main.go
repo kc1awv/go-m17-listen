@@ -64,12 +64,12 @@ type Client struct {
 func NewClient(callsign, relayAddr string, moduleLetter byte) (*Client, error) {
 	addr, err := net.ResolveUDPAddr("udp", relayAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve relay address: %w", err)
+		return nil, fmt.Errorf("failed to resolve address: %w", err)
 	}
 
 	conn, err := net.DialUDP("udp", nil, addr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial relay: %w", err)
+		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
 
 	codec2, err := codec2.New(codec2.MODE_3200)
@@ -172,13 +172,13 @@ func (c *Client) handlePing() {
 }
 
 func (c *Client) handleACKN() {
-	log.Println("Connection accepted by relay")
-	updateTUI("Status", "Connection accepted by relay")
+	log.Println("Connection accepted by relay/reflector")
+	updateTUI("Status", "Connection accepted by relay/reflector")
 }
 
 func (c *Client) handleNACK() {
-	log.Println("Connection not accepted by relay")
-	updateTUI("Status", "Connection not accepted by relay")
+	log.Println("Connection not accepted by relay/reflector")
+	updateTUI("Status", "Connection not accepted by relay/reflector")
 	c.sendDISC()
 	c.cancel()
 	c.conn.Close()
@@ -457,7 +457,7 @@ func main() {
 	flag.Parse()
 
 	if len(flag.Args()) < 1 || len(flag.Args()) > 2 {
-		log.Fatalf("Usage: %s [--tui] <relay_address> [module_letter]", os.Args[0])
+		log.Fatalf("Usage: %s [--tui] <address> [module_letter]", os.Args[0])
 	}
 
 	relayAddr := flag.Arg(0)
@@ -529,9 +529,9 @@ func main() {
 	// Wait for DISC packet from relay
 	select {
 	case <-client.discChan:
-		log.Println("Received DISC packet from relay, closing connection")
+		log.Println("Received DISC packet, closing connection")
 	case <-time.After(5 * time.Second):
-		log.Println("Timeout waiting for DISC packet from relay, closing connection")
+		log.Println("Timeout waiting for DISC packet, closing connection")
 	}
 
 	client.conn.Close()
