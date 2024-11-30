@@ -427,7 +427,9 @@ var fieldDisplayNames = map[string]string{
 
 func drawTUI() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	y := 0
+	tbprint(0, 0, termbox.ColorDefault, termbox.ColorDefault, "M17 Listen Client")
+	tbprint(0, 1, termbox.ColorDefault, termbox.ColorDefault, "") // Blank line
+	y := 2
 	for _, key := range []string{
 		"StreamID", "FrameNumber", "DST", "SRC", "TYPE", "META",
 		"PacketStreamIndicator", "DataTypeIndicator", "EncryptionType",

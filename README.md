@@ -49,14 +49,15 @@
     ```
 
 ## Usage
-
+- `--tui`: Run program with TUI interface
 - `<relay_address>`: The address of the M17 relay or reflector to connect to.
 - `<port>`: The port the relay or reflector is listening on.
 - `<module_letter>`: The optional module letter for mrefd reflectors.
 
 ### Example
 
-`./go-m17-listen 127.0.0.1:17000 A`
+- relay: `./go-m17-listen --tui 127.0.0.1:17000`
+- mrefd: `./go-m17-listen --tui 127.0.0.1:17000 A`
 
 ## Configuration
 
