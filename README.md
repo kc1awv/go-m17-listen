@@ -67,6 +67,7 @@ The program generates a random 9-character callsign starting with "LSTN" followe
 The program sends the following packets:
 
 - `LSTN`: Send a listen-only connection request to the relay or reflector.
+- `PONG`: Sends a PONG to the relay or reflector in response to a PING keepalive.
 - `DISC`: Disconnect from the relay or reflector.
 
 The program handles the following packet types:
