@@ -20,18 +20,22 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"go-m17-listen/codec2"
 
 	"github.com/hajimehoshi/oto"
+	"github.com/nsf/termbox-go"
 )
 
 const (
@@ -155,6 +159,7 @@ func (c *Client) handlePing() {
 	encodedCallsign, err := EncodeCallsign(c.callsign)
 	if err != nil {
 		log.Printf("failed to encode callsign: %v", err)
+		updateTUI("Error", fmt.Sprintf("failed to encode callsign: %v", err))
 		return
 	}
 
@@ -162,15 +167,18 @@ func (c *Client) handlePing() {
 	_, err = c.conn.Write(pongPacket)
 	if err != nil {
 		log.Printf("failed to send PONG packet: %v", err)
+		updateTUI("Error", fmt.Sprintf("failed to send PONG packet: %v", err))
 	}
 }
 
 func (c *Client) handleACKN() {
 	log.Println("Connection accepted by relay")
+	updateTUI("Status", "Connection accepted by relay")
 }
 
 func (c *Client) handleNACK() {
 	log.Println("Connection not accepted by relay")
+	updateTUI("Status", "Connection not accepted by relay")
 	c.sendDISC()
 	c.cancel()
 	c.conn.Close()
@@ -180,12 +188,14 @@ func (c *Client) handleNACK() {
 
 func (c *Client) handleDISC() {
 	log.Println("Received DISC packet")
+	updateTUI("Status", "Received DISC packet")
 	close(c.discChan)
 }
 
 func (c *Client) handleM17(packet []byte) {
 	if len(packet) < 54 {
 		log.Printf("invalid M17 packet length: %d", len(packet))
+		updateTUI("Error", fmt.Sprintf("invalid M17 packet length: %d", len(packet)))
 		return
 	}
 
@@ -213,21 +223,37 @@ func (c *Client) handleM17(packet []byte) {
 	log.Printf("Type field breakdown: PacketStreamIndicator=%d, DataTypeIndicator=%d, EncryptionType=%d, EncryptionSubtype=%d, ChannelAccessNumber=%d",
 		packetStreamIndicator, dataTypeIndicator, encryptionType, encryptionSubtype, channelAccessNumber)
 
+	updateTUI("StreamID", fmt.Sprintf("%d", streamID))
+	updateTUI("FrameNumber", fmt.Sprintf("%d", frameNumber))
+	updateTUI("DST", dst)
+	updateTUI("SRC", src)
+	updateTUI("TYPE", fmt.Sprintf("%d", typ))
+	updateTUI("META", fmt.Sprintf("%x", meta))
+	updateTUI("Payload", fmt.Sprintf("%x", payload))
+	updateTUI("PacketStreamIndicator", fmt.Sprintf("%d", packetStreamIndicator))
+	updateTUI("DataTypeIndicator", fmt.Sprintf("%d", dataTypeIndicator))
+	updateTUI("EncryptionType", fmt.Sprintf("%d", encryptionType))
+	updateTUI("EncryptionSubtype", fmt.Sprintf("%d", encryptionSubtype))
+	updateTUI("ChannelAccessNumber", fmt.Sprintf("%d", channelAccessNumber))
+
 	// Filter out packets that are not stream mode or are encrypted
 	if packetStreamIndicator == 0 || encryptionType != 0 {
 		log.Printf("Ignoring packet mode or encrypted packet: TYPE=%d", typ)
+		updateTUI("Status", fmt.Sprintf("Ignoring packet mode or encrypted packet: TYPE=%d", typ))
 		return
 	}
 
 	// Filter out packets that are not voice or voice + data
 	if dataTypeIndicator != 0b10 && dataTypeIndicator != 0b11 {
 		log.Printf("Ignoring non-voice packet: TYPE=%d", typ)
+		updateTUI("Status", fmt.Sprintf("Ignoring non-voice packet: TYPE=%d", typ))
 		return
 	}
 
 	// Ensure payload length is correct for Codec 2 at 3200 bps (16 bytes)
 	if len(payload) != 16 {
 		log.Printf("invalid payload length: %d", len(payload))
+		updateTUI("Error", fmt.Sprintf("invalid payload length: %d", len(payload)))
 		return
 	}
 
@@ -235,12 +261,14 @@ func (c *Client) handleM17(packet []byte) {
 	audio1, err := c.codec2.Decode(payload[:8])
 	if err != nil {
 		log.Printf("failed to decode first voice frame: %v", err)
+		updateTUI("Error", fmt.Sprintf("failed to decode first voice frame: %v", err))
 		return
 	}
 
 	audio2, err := c.codec2.Decode(payload[8:])
 	if err != nil {
 		log.Printf("failed to decode second voice frame: %v", err)
+		updateTUI("Error", fmt.Sprintf("failed to decode second voice frame: %v", err))
 		return
 	}
 
@@ -262,6 +290,7 @@ func (c *Client) playAudio(audio []int16) {
 	_, err := c.player.Write(buf)
 	if err != nil {
 		log.Printf("failed to play audio: %v", err)
+		updateTUI("Error", fmt.Sprintf("failed to play audio: %v", err))
 	}
 }
 
@@ -328,6 +357,7 @@ func (c *Client) listen() {
 					return
 				}
 				log.Printf("failed to read from UDP: %v", err)
+				updateTUI("Error", fmt.Sprintf("failed to read from UDP: %v", err))
 				continue
 			}
 
@@ -338,22 +368,128 @@ func (c *Client) listen() {
 
 func generateRandomCallsign() string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano())
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, 5)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		b[i] = charset[rng.Intn(len(charset))]
 	}
 	return "LSTN" + string(b)
 }
 
+var tuiData = map[string]string{
+	"StreamID":              "",
+	"FrameNumber":           "",
+	"DST":                   "",
+	"SRC":                   "",
+	"TYPE":                  "",
+	"META":                  "",
+	"PacketStreamIndicator": "",
+	"DataTypeIndicator":     "",
+	"EncryptionType":        "",
+	"EncryptionSubtype":     "",
+	"ChannelAccessNumber":   "",
+	"Payload":               "",
+	"Status":                "",
+	"Error":                 "",
+}
+
+func updateTUI(field, value string) {
+	switch field {
+	case "StreamID", "FrameNumber", "TYPE":
+		// Convert the value to hexadecimal
+		if intValue, err := strconv.Atoi(value); err == nil {
+			tuiData[field] = fmt.Sprintf("0x%X", intValue)
+		} else {
+			tuiData[field] = value // Fallback to the original value if conversion fails
+		}
+	default:
+		tuiData[field] = value
+	}
+	drawTUI()
+}
+
+var fieldDisplayNames = map[string]string{
+	"StreamID":              "Stream ID",
+	"FrameNumber":           "Frame Number",
+	"DST":                   "Destination",
+	"SRC":                   "Source",
+	"TYPE":                  "Type",
+	"META":                  "Metadata",
+	"PacketStreamIndicator": "Packet Stream Indicator",
+	"DataTypeIndicator":     "Data Type Indicator",
+	"EncryptionType":        "Encryption Type",
+	"EncryptionSubtype":     "Encryption Subtype",
+	"ChannelAccessNumber":   "Channel Access Number",
+	"Payload":               "Payload",
+	"Status":                "Status",
+	"Error":                 "Error",
+}
+
+func drawTUI() {
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	y := 0
+	for _, key := range []string{
+		"StreamID", "FrameNumber", "DST", "SRC", "TYPE", "META",
+		"PacketStreamIndicator", "DataTypeIndicator", "EncryptionType",
+		"EncryptionSubtype", "ChannelAccessNumber", "Payload",
+		"Status", "Error",
+	} {
+		displayName := fieldDisplayNames[key]
+		tbprint(0, y, termbox.ColorDefault, termbox.ColorDefault, displayName+":")
+		tbprint(26, y, termbox.ColorDefault, termbox.ColorDefault, tuiData[key])
+		y++
+	}
+	termbox.Flush()
+}
+
+func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
+	for _, c := range msg {
+		termbox.SetCell(x, y, c, fg, bg)
+		x++
+	}
+}
+
 func main() {
-	if len(os.Args) != 3 {
-		log.Fatalf("Usage: %s <relay_address> <module_letter>", os.Args[0])
+	var useTUI bool
+	flag.BoolVar(&useTUI, "tui", false, "Enable TUI")
+	flag.Parse()
+
+	if len(flag.Args()) < 1 || len(flag.Args()) > 2 {
+		log.Fatalf("Usage: %s [--tui] <relay_address> [module_letter]", os.Args[0])
 	}
 
-	relayAddr := os.Args[1]
-	moduleLetter := os.Args[2][0]
+	relayAddr := flag.Arg(0)
+	var moduleLetter byte
+	if len(flag.Args()) == 2 {
+		moduleLetter = flag.Arg(1)[0]
+	} else {
+		moduleLetter = ' ' // Default to space character
+	}
 	callsign := generateRandomCallsign()
+
+	if useTUI {
+		err := termbox.Init()
+		if err != nil {
+			log.Fatalf("failed to initialize termbox: %v", err)
+		}
+		defer termbox.Close()
+
+		// Redirect log output to io.Discard to disable logging to stdout
+		log.SetOutput(io.Discard)
+
+		go func() {
+			for {
+				switch ev := termbox.PollEvent(); ev.Type {
+				case termbox.EventKey:
+					if ev.Key == termbox.KeyCtrlC {
+						return
+					}
+				case termbox.EventError:
+					log.Printf("termbox error: %v", ev.Err)
+				}
+			}
+		}()
+	}
 
 	client, err := NewClient(callsign, relayAddr, moduleLetter)
 	if err != nil {
@@ -370,18 +506,30 @@ func main() {
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
 
-	log.Println("Shutting down client...")
+	select {
+	case <-sigChan:
+		log.Println("Shutting down client...")
+	case <-func() chan struct{} {
+		done := make(chan struct{})
+		go func() {
+			termbox.PollEvent()
+			close(done)
+		}()
+		return done
+	}():
+		log.Println("TUI closed, shutting down client...")
+	}
+
 	client.sendDISC()
 	client.cancel()
 
-	// Wait for DISC packet
+	// Wait for DISC packet from relay
 	select {
 	case <-client.discChan:
-		log.Println("Received DISC packet, closing connection")
+		log.Println("Received DISC packet from relay, closing connection")
 	case <-time.After(5 * time.Second):
-		log.Println("Timeout waiting for DISC packet, closing connection")
+		log.Println("Timeout waiting for DISC packet from relay, closing connection")
 	}
 
 	client.conn.Close()
