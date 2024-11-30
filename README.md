@@ -1,10 +1,10 @@
 # go-m17-listen
 
-`go-m17-listen` is a Go program that connects to an M17 relay as a listen-only client. It decodes M17 voice packets using the Codec 2 vocoder and plays the audio through the speakers.
+`go-m17-listen` is a Go program that connects to an M17 relay or reflector as a listen-only client. It decodes M17 voice packets using the Codec 2 vocoder and plays the audio through the speakers.
 
 ## Features
 
-- Connects to an M17 relay as a listen-only client.
+- Connects to an M17 relay or reflector as a listen-only client.
 - Decodes M17 voice packets using Codec 2.
 - Plays decoded audio through the speakers.
 - Handles optional module letters for mrefd reflectors.
@@ -88,6 +88,7 @@ This project is licensed under the GNU General Public License v3.0. See the LICE
 ## Acknowledgements
 
 [Codec 2](https://github.com/drowe67/codec2) - Open source low bit rate speech codec.
+
 [Oto](https://github.com/ebitengine/oto) - A low-level library to play sound on multiple platforms.
 
 ## Contributing
