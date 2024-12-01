@@ -33,11 +33,13 @@ import (
 func main() {
 	// Parse command line arguments
 	var useTUI bool
+	var useGUI bool
 	flag.BoolVar(&useTUI, "tui", false, "Enable TUI")
+	flag.BoolVar(&useGUI, "gui", false, "Enable GUI")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 || len(flag.Args()) > 2 {
-		log.Fatalf("Usage: %s [--tui] <address> [module_letter]", os.Args[0])
+		log.Fatalf("Usage: %s [--tui] [--gui] <address> [module_letter]", os.Args[0])
 	}
 
 	relayAddr := flag.Arg(0)
@@ -76,50 +78,79 @@ func main() {
 		}()
 	}
 
-	// Create M17 client
-	client, err := NewClient(callsign, relayAddr, moduleLetter)
-	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
-	}
-
-	// Send LSTN packet
-	err = client.sendLSTN()
-	if err != nil {
-		log.Fatalf("failed to send LSTN packet: %v", err)
-	}
-
-	// Listen for incoming packets
-	go client.listen()
-
-	// Handle graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	select {
-	case <-sigChan:
-		log.Println("Shutting down client...")
-	case <-func() chan struct{} {
-		done := make(chan struct{})
+	if useGUI {
 		go func() {
-			termbox.PollEvent()
-			close(done)
+			// Redirect log output to io.Discard to disable logging to stdout
+			log.SetOutput(io.Discard)
+
+			client, err := NewClient(callsign, relayAddr, moduleLetter)
+			if err != nil {
+				log.Fatalf("failed to create client: %v", err)
+			}
+			err = client.sendLSTN()
+			if err != nil {
+				log.Fatalf("failed to send LSTN packet: %v", err)
+			}
+			go client.listen()
+
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+			select {
+			case <-sigChan:
+				log.Println("Shutting down client...")
+			case <-func() chan struct{} {
+				done := make(chan struct{})
+				go func() {
+					termbox.PollEvent()
+					close(done)
+				}()
+				return done
+			}():
+				log.Println("GUI closed, shutting down client...")
+			}
+			client.sendDISC()
+			client.cancel()
+			select {
+			case <-client.discChan:
+				log.Println("Received DISC packet from relay, exiting...")
+			case <-time.After(5 * time.Second):
+				log.Println("Timeout waiting for DISC packet, exiting...")
+			}
 		}()
-		return done
-	}():
-		log.Println("TUI closed, shutting down client...")
+		startGUI()
+	} else {
+		client, err := NewClient(callsign, relayAddr, moduleLetter)
+		if err != nil {
+			log.Fatalf("failed to create client: %v", err)
+		}
+		err = client.sendLSTN()
+		if err != nil {
+			log.Fatalf("failed to send LSTN packet: %v", err)
+		}
+		go client.listen()
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case <-sigChan:
+			log.Println("Shutting down client...")
+		case <-func() chan struct{} {
+			done := make(chan struct{})
+			go func() {
+				termbox.PollEvent()
+				close(done)
+			}()
+			return done
+		}():
+			log.Println("TUI closed, shutting down client...")
+		}
+		client.sendDISC()
+		client.cancel()
+		select {
+		case <-client.discChan:
+			log.Println("Received DISC packet from relay, exiting...")
+		case <-time.After(5 * time.Second):
+			log.Println("Timeout waiting for DISC packet, exiting...")
+		}
 	}
-
-	client.sendDISC()
-	client.cancel()
-
-	// Wait for DISC packet from relay
-	select {
-	case <-client.discChan:
-		log.Println("Received DISC packet, closing connection")
-	case <-time.After(5 * time.Second):
-		log.Println("Timeout waiting for DISC packet, closing connection")
-	}
-
-	client.conn.Close()
-	client.player.Close()
 }

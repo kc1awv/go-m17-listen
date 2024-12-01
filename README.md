@@ -22,6 +22,35 @@
 
    **Recommended version: 1.20 or later.**
 
+3. **Install any required dependencies**
+
+   - GLFW and OpenGL Libraries:
+      
+      These are required for the fyne GUI library which depends on glfw for window management.
+      Install the necessary development packages:
+
+      ```bash
+      sudo apt-get install libgl1-mesa-dev xorg-dev
+      ```
+
+   - X11 Development Libraries:
+
+      These are required for glfw and other graphical dependencies.
+      Install the necessary development packages:
+
+      ```bash
+      sudo apt-get install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev
+      ```
+
+   - ALSA (Advanced Linux Sound Architecture):
+
+      Required for audio playback using the `oto` library.
+      Install the necessary development package:
+
+      ```bash
+      sudo apt-get install libasound2-dev
+      ```
+
 3. **Clone the Repository**
 
    ```sh
@@ -50,13 +79,14 @@
 
 ## Usage
 - `--tui`: Run program with TUI interface
+- `--gui`: Run program with GUI interface
 - `<relay_address>`: The address of the M17 relay or reflector to connect to.
 - `<port>`: The port the relay or reflector is listening on.
 - `<module_letter>`: The optional module letter for mrefd reflectors.
 
 ### Example
 
-- relay: `./go-m17-listen --tui 127.0.0.1:17000`
+- relay: `./go-m17-listen --gui 127.0.0.1:17000`
 - mrefd: `./go-m17-listen --tui 127.0.0.1:17000 A`
 
 ## Configuration
