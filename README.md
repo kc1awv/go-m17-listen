@@ -123,6 +123,10 @@ This project is licensed under the GNU General Public License v3.0. See the LICE
 
 [Oto](https://github.com/ebitengine/oto) - A low-level library to play sound on multiple platforms.
 
+[termbox-go](https://github.com/nsf/termbox-go) - Pure Go termbox implementation.
+
+[Fyne.io](https://fyne.io/) - An easy to learn toolkit for creating graphical apps for desktop, mobile and web.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on GitHub.
