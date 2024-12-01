@@ -74,7 +74,7 @@
 
     - Run the program (without building)
     ```sh
-    go run . [--tui | gui] <relay_address>:<port> [module]
+    go run . [--tui | --gui] <relay_address>:<port> [module]
     ```
 
 ## Usage
