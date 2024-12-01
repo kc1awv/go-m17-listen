@@ -112,6 +112,7 @@ func (c *Client) listen() {
 				}
 				log.Printf("failed to read from UDP: %v", err)
 				updateTUI("Error", fmt.Sprintf("failed to read from UDP: %v", err))
+				updateGUI("Error", fmt.Sprintf("failed to read from UDP: %v", err))
 				continue
 			}
 
@@ -119,6 +120,7 @@ func (c *Client) listen() {
 			if !addr.IP.Equal(c.relayAddr.IP) || addr.Port != c.relayAddr.Port {
 				log.Printf("received packet from unknown source: %v", addr)
 				updateTUI("Error", fmt.Sprintf("received packet from unknown source: %v", addr))
+				updateGUI("Error", fmt.Sprintf("received packet from unknown source: %v", addr))
 				continue
 			}
 
@@ -192,6 +194,7 @@ func (c *Client) handlePing() {
 	if err != nil {
 		log.Printf("failed to encode callsign: %v", err)
 		updateTUI("Error", fmt.Sprintf("failed to encode callsign: %v", err))
+		updateGUI("Error", fmt.Sprintf("failed to encode callsign: %v", err))
 		return
 	}
 
@@ -200,6 +203,7 @@ func (c *Client) handlePing() {
 	if err != nil {
 		log.Printf("failed to send PONG packet: %v", err)
 		updateTUI("Error", fmt.Sprintf("failed to send PONG packet: %v", err))
+		updateGUI("Error", fmt.Sprintf("failed to send PONG packet: %v", err))
 	}
 }
 
@@ -207,12 +211,14 @@ func (c *Client) handlePing() {
 func (c *Client) handleACKN() {
 	log.Println("Connection accepted by relay/reflector")
 	updateTUI("Status", "Connection accepted by relay/reflector")
+	updateGUI("Status", "Connection accepted by relay/reflector")
 }
 
 // handleNACK handles a NACK packet
 func (c *Client) handleNACK() {
 	log.Println("Connection not accepted by relay/reflector")
 	updateTUI("Status", "Connection not accepted by relay/reflector")
+	updateGUI("Status", "Connection not accepted by relay/reflector")
 	c.sendDISC()
 	c.cancel()
 	c.conn.Close()
@@ -224,6 +230,7 @@ func (c *Client) handleNACK() {
 func (c *Client) handleDISC() {
 	log.Println("Received DISC packet")
 	updateTUI("Status", "Received DISC packet")
+	updateGUI("Status", "Received DISC packet")
 	close(c.discChan)
 }
 
@@ -232,6 +239,7 @@ func (c *Client) handleM17(packet []byte) {
 	if len(packet) < 54 {
 		log.Printf("invalid M17 packet length: %d", len(packet))
 		updateTUI("Error", fmt.Sprintf("invalid M17 packet length: %d", len(packet)))
+		updateGUI("Error", fmt.Sprintf("invalid M17 packet length: %d", len(packet)))
 		return
 	}
 
@@ -256,7 +264,7 @@ func (c *Client) handleM17(packet []byte) {
 	channelAccessNumber := (typ >> 7) & 0x000F
 
 	// Log packet fields
-	log.Printf("Received M17 packet: StreamID=%d, FrameNumber=%d, DST=%s, SRC=%s, TYPE=%d, META=%x", streamID, frameNumber, dst, src, typ, meta)
+	log.Printf("Received M17 packet: StreamID=0x%X, FrameNumber=0x%X, DST=%s, SRC=%s, TYPE=0x%X, META=%x", streamID, frameNumber, dst, src, typ, meta)
 	log.Printf("Type field breakdown: PacketStreamIndicator=%d, DataTypeIndicator=%d, EncryptionType=%d, EncryptionSubtype=%d, ChannelAccessNumber=%d",
 		packetStreamIndicator, dataTypeIndicator, encryptionType, encryptionSubtype, channelAccessNumber)
 
@@ -274,10 +282,25 @@ func (c *Client) handleM17(packet []byte) {
 	updateTUI("EncryptionSubtype", fmt.Sprintf("%d", encryptionSubtype))
 	updateTUI("ChannelAccessNumber", fmt.Sprintf("%d", channelAccessNumber))
 
+	// Update GUI with packet fields
+	updateGUI("StreamID", fmt.Sprintf("%X", streamID))
+	updateGUI("FrameNumber", fmt.Sprintf("%X", frameNumber))
+	updateGUI("DST", dst)
+	updateGUI("SRC", src)
+	updateGUI("TYPE", fmt.Sprintf("%X", typ))
+	updateGUI("META", fmt.Sprintf("%x", meta))
+	updateGUI("PacketStreamIndicator", fmt.Sprintf("%d", packetStreamIndicator))
+	updateGUI("DataTypeIndicator", fmt.Sprintf("%d", dataTypeIndicator))
+	updateGUI("EncryptionType", fmt.Sprintf("%d", encryptionType))
+	updateGUI("EncryptionSubtype", fmt.Sprintf("%d", encryptionSubtype))
+	updateGUI("ChannelAccessNumber", fmt.Sprintf("%d", channelAccessNumber))
+	updateGUI("Payload", fmt.Sprintf("%x", payload))
+
 	// Filter out packets that are not stream mode or are encrypted
 	if packetStreamIndicator == 0 || encryptionType != 0 {
 		log.Printf("Ignoring packet mode or encrypted packet: TYPE=%d", typ)
 		updateTUI("Status", fmt.Sprintf("Ignoring packet mode or encrypted packet: TYPE=%d", typ))
+		updateGUI("Status", fmt.Sprintf("Ignoring packet mode or encrypted packet: TYPE=%d", typ))
 		return
 	}
 
@@ -285,6 +308,7 @@ func (c *Client) handleM17(packet []byte) {
 	if dataTypeIndicator != 0b10 && dataTypeIndicator != 0b11 {
 		log.Printf("Ignoring non-voice packet: TYPE=%d", typ)
 		updateTUI("Status", fmt.Sprintf("Ignoring non-voice packet: TYPE=%d", typ))
+		updateGUI("Status", fmt.Sprintf("Ignoring non-voice packet: TYPE=%d", typ))
 		return
 	}
 
@@ -292,6 +316,7 @@ func (c *Client) handleM17(packet []byte) {
 	if len(payload) != 16 {
 		log.Printf("invalid payload length: %d", len(payload))
 		updateTUI("Error", fmt.Sprintf("invalid payload length: %d", len(payload)))
+		updateGUI("Error", fmt.Sprintf("invalid payload length: %d", len(payload)))
 		return
 	}
 
@@ -300,6 +325,7 @@ func (c *Client) handleM17(packet []byte) {
 	if err != nil {
 		log.Printf("failed to decode first voice frame: %v", err)
 		updateTUI("Error", fmt.Sprintf("failed to decode first voice frame: %v", err))
+		updateGUI("Error", fmt.Sprintf("failed to decode first voice frame: %v", err))
 		return
 	}
 
@@ -307,6 +333,7 @@ func (c *Client) handleM17(packet []byte) {
 	if err != nil {
 		log.Printf("failed to decode second voice frame: %v", err)
 		updateTUI("Error", fmt.Sprintf("failed to decode second voice frame: %v", err))
+		updateGUI("Error", fmt.Sprintf("failed to decode second voice frame: %v", err))
 		return
 	}
 
