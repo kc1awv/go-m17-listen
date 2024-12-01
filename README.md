@@ -58,10 +58,10 @@
    cd go-m17-listen
    ```
 
-4. Install Dependencies
+4. Install Go Dependencies
 
     ```sh
-    go get -u github.com/hajimehoshi/oto
+    go mod tidy
     ```
 
 5. Run or build the Program
