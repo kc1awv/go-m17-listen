@@ -68,7 +68,7 @@
 
     - Build and run the program
     ```sh
-    go build -o go-m17-listen main.go codec2/codec2.go
+    go build
     ./go-m17-listen [--tui | --gui] <relay_address>:<port> [module]
     ```
 
