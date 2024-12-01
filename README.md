@@ -69,12 +69,12 @@
     - Build and run the program
     ```sh
     go build -o go-m17-listen main.go codec2/codec2.go
-    ./go-m17-listen <relay_address>:<port> <module>
+    ./go-m17-listen [--tui | --gui] <relay_address>:<port> [module]
     ```
 
     - Run the program (without building)
     ```sh
-    go run . <relay_address>:<port> <module>
+    go run . [--tui | gui] <relay_address>:<port> [module]
     ```
 
 ## Usage
