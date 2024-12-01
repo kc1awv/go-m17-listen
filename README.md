@@ -89,6 +89,12 @@
 - relay: `./go-m17-listen --gui 127.0.0.1:17000`
 - mrefd: `./go-m17-listen --tui 127.0.0.1:17000 A`
 
+#### TUI Interface
+![TUI interface](media/tui.png)
+
+#### GUI Interface
+![GUI Interface](media/gui.png)
+
 ## Configuration
 
 The program generates a random 9-character callsign starting with "LSTN" followed by 5 random characters (letters A through Z and digits 0 through 9).
